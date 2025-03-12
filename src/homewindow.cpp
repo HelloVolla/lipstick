@@ -29,7 +29,12 @@ public:
     HomeWindowPrivate();
     ~HomeWindowPrivate();
 
-    enum Mode { Unknown, Compositor, Window };
+    enum Mode {
+        Unknown,
+        Compositor,
+        Window
+    };
+
     static Mode mode;
     static bool isWindow();
     static bool isCompositor();
@@ -49,7 +54,7 @@ public:
 HomeWindowPrivate::Mode HomeWindowPrivate::mode = HomeWindowPrivate::Unknown;
 
 HomeWindowPrivate::HomeWindowPrivate()
-: isVisible(false), window(0), compositorWindow(0), context(0), root(0)
+    : isVisible(false), window(0), compositorWindow(0), context(0), root(0)
 {
     checkMode();
     if (0 == HomeApplication::instance())
@@ -98,7 +103,7 @@ void HomeWindowPrivate::checkMode()
 }
 
 HomeWindow::HomeWindow()
-: d(new HomeWindowPrivate)
+    : d(new HomeWindowPrivate)
 {
 }
 

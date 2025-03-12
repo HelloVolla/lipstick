@@ -25,6 +25,8 @@ namespace {
 // deprecated
 const char *HINT_ICON = "x-nemo-icon";
 const char *HINT_PREVIEW_ICON = "x-nemo-preview-icon";
+
+const char *INTERNAL_HINT_PRIVILEGED = "privileged";
 }
 
 const char *LipstickNotification::HINT_URGENCY = "urgency";
@@ -44,12 +46,12 @@ const char *LipstickNotification::HINT_PREVIEW_SUMMARY = "x-nemo-preview-summary
 const char *LipstickNotification::HINT_SUB_TEXT = "x-nemo-sub-text";
 const char *LipstickNotification::HINT_REMOTE_ACTION_PREFIX = "x-nemo-remote-action-";
 const char *LipstickNotification::HINT_REMOTE_ACTION_ICON_PREFIX = "x-nemo-remote-action-icon-";
+const char *LipstickNotification::HINT_REMOTE_ACTION_TYPE_PREFIX = "x-nemo-remote-action-type-";
 const char *LipstickNotification::HINT_USER_REMOVABLE = "x-nemo-user-removable";
 const char *LipstickNotification::HINT_FEEDBACK = "x-nemo-feedback";
 const char *LipstickNotification::HINT_DISPLAY_ON = "x-nemo-display-on";
 const char *LipstickNotification::HINT_ORIGIN_PACKAGE = "x-nemo-origin-package";
 const char *LipstickNotification::HINT_OWNER = "x-nemo-owner";
-const char *LipstickNotification::HINT_RESTORED = "x-nemo-restored";
 const char *LipstickNotification::HINT_PROGRESS = "x-nemo-progress";
 const char *LipstickNotification::HINT_VIBRA = "x-nemo-vibrate";
 const char *LipstickNotification::HINT_VISIBILITY = "x-nemo-visibility";
@@ -393,14 +395,16 @@ QVariantList LipstickNotification::remoteActions() const
             vm.insert(QStringLiteral("displayName"), displayName);
         }
 
+        const QString icon(m_hints.value(LipstickNotification::HINT_REMOTE_ACTION_ICON_PREFIX + name).toString());
+        if (!icon.isEmpty()) {
+            vm.insert(QStringLiteral("icon"), icon);
+        }
+
+        const QString type(m_hints.value(LipstickNotification::HINT_REMOTE_ACTION_TYPE_PREFIX + name).toString());
+        vm.insert(QStringLiteral("type"), type);
+
         const QString hint(m_hints.value(LipstickNotification::HINT_REMOTE_ACTION_PREFIX + name).toString());
         if (!hint.isEmpty()) {
-            const QString icon(m_hints.value(LipstickNotification::HINT_REMOTE_ACTION_ICON_PREFIX + name).toString());
-
-            if (!icon.isEmpty()) {
-                vm.insert(QStringLiteral("icon"), icon);
-            }
-
             // Extract the element of the DBus call
             QStringList elements(hint.split(' ', QString::SkipEmptyParts));
             if (elements.size() <= 3) {
@@ -439,7 +443,12 @@ QString LipstickNotification::owner() const
 
 bool LipstickNotification::restored() const
 {
-    return m_hints.value(LipstickNotification::HINT_RESTORED).toBool();
+    return m_restored;
+}
+
+void LipstickNotification::setRestored(bool restored)
+{
+    m_restored = restored;
 }
 
 qreal LipstickNotification::progress() const
@@ -479,6 +488,26 @@ void LipstickNotification::restartProgressTimer()
     }
 }
 
+QVariantHash LipstickNotification::internalHints() const
+{
+    return m_internalHints;
+}
+
+void LipstickNotification::setInternalHints(const QVariantHash &hints)
+{
+    m_internalHints = hints;
+}
+
+void LipstickNotification::setPrivilegedSource(bool privileged)
+{
+    m_internalHints[INTERNAL_HINT_PRIVILEGED] = privileged;
+}
+
+bool LipstickNotification::privilegedSource() const
+{
+    return m_internalHints.value(INTERNAL_HINT_PRIVILEGED, false).toBool();
+}
+
 void LipstickNotification::updateHintValues()
 {
     m_hintValues.clear();
@@ -510,7 +539,8 @@ void LipstickNotification::updateHintValues()
             hint.compare(LipstickNotification::HINT_OWNER, Qt::CaseInsensitive) != 0 &&
             hint.compare(LipstickNotification::HINT_PROGRESS, Qt::CaseInsensitive) &&
             !hint.startsWith(LipstickNotification::HINT_REMOTE_ACTION_PREFIX, Qt::CaseInsensitive) &&
-            !hint.startsWith(LipstickNotification::HINT_REMOTE_ACTION_ICON_PREFIX, Qt::CaseInsensitive)) {
+            !hint.startsWith(LipstickNotification::HINT_REMOTE_ACTION_ICON_PREFIX, Qt::CaseInsensitive) &&
+            !hint.startsWith(LipstickNotification::HINT_REMOTE_ACTION_TYPE_PREFIX, Qt::CaseInsensitive)) {
             m_hintValues.insert(hint, it.value());
         }
     }

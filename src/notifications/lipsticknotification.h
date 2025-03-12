@@ -113,6 +113,9 @@ public:
     //! Nemo hint: Icon for the remote action of the notification. Prefix only: the action identifier is to be appended.
     static const char *HINT_REMOTE_ACTION_ICON_PREFIX;
 
+    //! Nemo hint: Optional type for the remote action of the notification. Prefix only: the action identifier is to be appended.
+    static const char *HINT_REMOTE_ACTION_TYPE_PREFIX;
+
     //! Nemo hint: User removability of the notification.
     static const char *HINT_USER_REMOVABLE;
 
@@ -127,10 +130,6 @@ public:
 
     //! Nemo hint: Indicates the identifer of the owner for notification
     static const char *HINT_OWNER;
-
-    //! Nemo hint: Indicates that this notification has been restored from persistent storage since the last update.
-    //! Internal, shouldn't be expected or allowed from d-bus
-    static const char *HINT_RESTORED;
 
     //! Nemo hint: progress percentage between 0 and 1, negative for indeterminate
     static const char *HINT_PROGRESS;
@@ -262,6 +261,7 @@ public:
 
     //! Returns true if the notification has been restored since it was last modified
     bool restored() const;
+    void setRestored(bool restored);
 
     qreal progress() const;
 
@@ -272,6 +272,14 @@ public:
 
     //! \internal
     void restartProgressTimer();
+
+    // Properties internal to lipstick, not visible over D-Bus
+    QVariantHash internalHints() const;
+    void setInternalHints(const QVariantHash &hints);
+
+    // Notification came from process with privileged group
+    void setPrivilegedSource(bool privileged);
+    bool privilegedSource() const;
 
     /*!
      * Creates a copy of an existing representation of a notification.
@@ -291,8 +299,9 @@ signals:
      * Sent when an action defined for the notification is invoked.
      *
      * \param action the action that was invoked
+     * \param actionText parameter for the action
      */
-    void actionInvoked(QString action);
+    void actionInvoked(QString action, QString actionText = QString());
 
     //! Sent when the removal of this notification was requested.
     void removeRequested();
@@ -372,6 +381,9 @@ private:
     //! Hints for the notification
     QVariantHash m_hints;
     QVariantMap m_hintValues;
+    QVariantHash m_internalHints;
+
+    bool m_restored = false;
 
     //! Expiration timeout for the notification
     int m_expireTimeout;
@@ -393,6 +405,7 @@ public:
     NotificationList();
     NotificationList(const QList<LipstickNotification *> &notificationList);
     NotificationList(const NotificationList &notificationList);
+    NotificationList &operator=(const NotificationList &) = default;
     QList<LipstickNotification *> notifications() const;
     friend QDBusArgument &operator<<(QDBusArgument &, const NotificationList &);
     friend const QDBusArgument &operator>>(const QDBusArgument &, NotificationList &);

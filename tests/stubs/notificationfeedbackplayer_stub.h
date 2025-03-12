@@ -24,10 +24,8 @@ class NotificationFeedbackPlayerStub : public StubBase
 {
 public:
     virtual void NotificationFeedbackPlayerConstructor(QObject *parent);
-    virtual int minimumPriority() const;
-    virtual void setMinimumPriority(int minimumPriority);
     virtual void init();
-    virtual void addNotification(uint id);
+    virtual bool addNotification(uint id);
     virtual void removeNotification(uint id);
 };
 
@@ -35,19 +33,6 @@ public:
 void NotificationFeedbackPlayerStub::NotificationFeedbackPlayerConstructor(QObject *parent)
 {
     Q_UNUSED(parent);
-
-}
-int NotificationFeedbackPlayerStub::minimumPriority() const
-{
-    stubMethodEntered("minimumPriority");
-    return stubReturnValue<int>("minimumPriority");
-}
-
-void NotificationFeedbackPlayerStub::setMinimumPriority(int minimumPriority)
-{
-    QList<ParameterBase *> params;
-    params.append( new Parameter<int >(minimumPriority));
-    stubMethodEntered("setMinimumPriority", params);
 }
 
 void NotificationFeedbackPlayerStub::init()
@@ -55,20 +40,20 @@ void NotificationFeedbackPlayerStub::init()
     stubMethodEntered("init");
 }
 
-void NotificationFeedbackPlayerStub::addNotification(uint id)
+bool NotificationFeedbackPlayerStub::addNotification(uint id)
 {
     QList<ParameterBase *> params;
-    params.append( new Parameter<uint >(id));
+    params.append(new Parameter<uint >(id));
     stubMethodEntered("addNotification", params);
+    return stubReturnValue<bool>("addNotification");
 }
 
 void NotificationFeedbackPlayerStub::removeNotification(uint id)
 {
     QList<ParameterBase *> params;
-    params.append( new Parameter<uint >(id));
+    params.append(new Parameter<uint >(id));
     stubMethodEntered("removeNotification", params);
 }
-
 
 
 // 3. CREATE A STUB INSTANCE
@@ -83,24 +68,14 @@ NotificationFeedbackPlayer::NotificationFeedbackPlayer(QObject *parent)
     gNotificationFeedbackPlayerStub->NotificationFeedbackPlayerConstructor(parent);
 }
 
-int NotificationFeedbackPlayer::minimumPriority() const
-{
-    return gNotificationFeedbackPlayerStub->minimumPriority();
-}
-
-void NotificationFeedbackPlayer::setMinimumPriority(int minimumPriority)
-{
-    gNotificationFeedbackPlayerStub->setMinimumPriority(minimumPriority);
-}
-
 void NotificationFeedbackPlayer::init()
 {
     gNotificationFeedbackPlayerStub->init();
 }
 
-void NotificationFeedbackPlayer::addNotification(uint id)
+bool NotificationFeedbackPlayer::addNotification(uint id)
 {
-    gNotificationFeedbackPlayerStub->addNotification(id);
+    return gNotificationFeedbackPlayerStub->addNotification(id);
 }
 
 void NotificationFeedbackPlayer::removeNotification(uint id)

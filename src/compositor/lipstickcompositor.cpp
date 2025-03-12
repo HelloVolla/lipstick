@@ -1,6 +1,6 @@
 /***************************************************************************
 **
-** Copyright (c) 2013 - 2019 Jolla Ltd.
+** Copyright (c) 2013 - 2023 Jolla Ltd.
 ** Copyright (c) 2019 - 2020 Open Mobile Platform LLC.
 **
 ** This file is part of lipstick.
@@ -44,15 +44,26 @@
 #include "alienmanager/alienmanager.h"
 #include "logging.h"
 
+namespace {
+bool debuggingCompositorHandover()
+{
+    static int debugging = -1;
+    if (debugging < 0) {
+        const QByteArray raw(qgetenv("DEBUG_COMPOSITOR_HANDOVER"));
+        const QString env(QString::fromLocal8Bit(raw));
+        debugging = env.startsWith('y');
+    }
+    return debugging > 0;
+}
+}
+
 LipstickCompositor *LipstickCompositor::m_instance = 0;
 
 LipstickCompositor::LipstickCompositor()    
-#if QTCOMPOSITOR_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-    : QWaylandQuickCompositor(nullptr, (QWaylandCompositor::ExtensionFlags)QWaylandCompositor::DefaultExtensions & ~QWaylandCompositor::QtKeyExtension)
+    : QWaylandQuickCompositor(nullptr,
+                              static_cast<QWaylandCompositor::ExtensionFlags>(
+                                  QWaylandCompositor::DefaultExtensions & ~QWaylandCompositor::QtKeyExtension))
     , m_output(this, this, QString(), QString())
-#else
-    : QWaylandQuickCompositor(this, 0, (QWaylandCompositor::ExtensionFlags)QWaylandCompositor::DefaultExtensions & ~QWaylandCompositor::QtKeyExtension)
-#endif
     , m_totalWindowCount(0)
     , m_nextWindowId(1)
     , m_homeActive(true)
@@ -64,6 +75,7 @@ LipstickCompositor::LipstickCompositor()
     , m_retainedSelection(0)
     , m_updatesEnabled(true)
     , m_completed(false)
+    , m_synthesizeBackEvent(true)
     , m_onUpdatesDisabledUnfocusedWindowId(0)
     , m_keymap(0)
     , m_fakeRepaintTimerId(0)
@@ -71,14 +83,22 @@ LipstickCompositor::LipstickCompositor()
     , m_mceNameOwner(new QMceNameOwner(this))
     , m_sessionActivationTries(0)
 {
-    setColor(Qt::black);
+    QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("DisplayOn");
+    if (debuggingCompositorHandover()) {
+        setColor(Qt::magenta);
+        showFullScreen();
+    } else {
+        setColor(Qt::black);
+    }
+
     setRetainedSelectionEnabled(true);
     addDefaultShell();
 
-    if (m_instance) qFatal("LipstickCompositor: Only one compositor instance per process is supported");
+    if (m_instance)
+        qFatal("LipstickCompositor: Only one compositor instance per process is supported");
     m_instance = this;
 
-    m_orientationLock = new MGConfItem("/lipstick/orientationLock", this);
+    m_orientationLock = new MDConfItem("/lipstick/orientationLock", this);
     connect(m_orientationLock, SIGNAL(valueChanged()), SIGNAL(orientationLockChanged()));
 
     connect(this, SIGNAL(visibleChanged(bool)), this, SLOT(onVisibleChanged(bool)));
@@ -111,7 +131,11 @@ LipstickCompositor::LipstickCompositor()
     QObject::connect(m_mceNameOwner, &QMceNameOwner::nameOwnerChanged,
                      this, &LipstickCompositor::processQueuedSetUpdatesEnabledCalls);
 
-    setUpdatesEnabledNow(false);
+    if (debuggingCompositorHandover()) {
+        // Leave window visible and display on
+    } else {
+        setUpdatesEnabledNow(false);
+    }
     QTimer::singleShot(0, this, SLOT(initialize()));
 
     setClientFullScreenHint(true);
@@ -174,14 +198,10 @@ void LipstickCompositor::onVisibleChanged(bool visible)
 
 void LipstickCompositor::componentComplete()
 {
-#if QTCOMPOSITOR_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     QScreen * const screen = QGuiApplication::primaryScreen();
 
     m_output.setGeometry(QRect(QPoint(0, 0), screen->size()));
     m_output.setPhysicalSize(screen->physicalSize().toSize());
-#else
-    QWaylandCompositor::setOutputGeometry(QRect(0, 0, width(), height()));
-#endif
 }
 
 void LipstickCompositor::surfaceCreated(QWaylandSurface *surface)
@@ -285,6 +305,19 @@ bool LipstickCompositor::completed()
     return m_completed;
 }
 
+bool LipstickCompositor::synthesizeBackEvent() const
+{
+    return m_synthesizeBackEvent;
+}
+
+void LipstickCompositor::setSynthesizeBackEvent(bool enable)
+{
+    if (enable != m_synthesizeBackEvent) {
+        m_synthesizeBackEvent = enable;
+        emit synthesizeBackEventChanged();
+    }
+}
+
 int LipstickCompositor::windowIdForLink(int siblingId, uint link) const
 {
     if (LipstickCompositorWindow *sibling = m_windows.value(siblingId)) {
@@ -357,7 +390,8 @@ QWaylandSurfaceView *LipstickCompositor::createView(QWaylandSurface *surface)
     QString category = properties.value("CATEGORY").toString();
 
     int id = m_nextWindowId++;
-    LipstickCompositorWindow *item = new LipstickCompositorWindow(id, category, static_cast<QWaylandQuickSurface *>(surface));
+    LipstickCompositorWindow *item = new LipstickCompositorWindow(id, category,
+                                                                  static_cast<QWaylandQuickSurface *>(surface));
     item->setParent(this);
     QObject::connect(item, SIGNAL(destroyed(QObject*)), this, SLOT(windowDestroyed()));
     m_windows.insert(item->windowId(), item);
@@ -366,7 +400,8 @@ QWaylandSurfaceView *LipstickCompositor::createView(QWaylandSurface *surface)
 
 static LipstickCompositorWindow *surfaceWindow(QWaylandSurface *surface)
 {
-    return surface->views().isEmpty() ? 0 : static_cast<LipstickCompositorWindow *>(surface->views().first());
+    return surface->views().isEmpty() ? nullptr
+                                      : static_cast<LipstickCompositorWindow *>(surface->views().first());
 }
 
 void LipstickCompositor::activateLogindSession()
@@ -886,7 +921,7 @@ bool LipstickCompositor::event(QEvent *event)
     if (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonRelease) {
         QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
 
-        if (mouseEvent->button() == Qt::RightButton) {
+        if (m_synthesizeBackEvent && mouseEvent->button() == Qt::RightButton) {
             // see xkeyboard-config/keycodes/evdev: Map to <I166> = 166; #define KEY_BACK
             int scanCode = 166;
             if (mouseEvent->type() == QEvent::MouseButtonPress) {
@@ -902,13 +937,13 @@ bool LipstickCompositor::event(QEvent *event)
 
 void LipstickCompositor::sendKeyEvent(QEvent::Type type, Qt::Key key, quint32 nativeScanCode)
 {
-    QKeyEvent *event = new QKeyEvent(type, key, Qt::NoModifier, nativeScanCode, 0, 0);
+    QKeyEvent event(type, key, Qt::NoModifier, nativeScanCode, 0, 0);
 
     // Not all Lipstick windows are real windows
     LipstickCompositorWindow *topmostWindow = qobject_cast<LipstickCompositorWindow *>(windowForId(topmostWindowId()));
     if (topmostWindow && topmostWindow->isInProcess()) {
-        QCoreApplication::sendEvent(activeFocusItem(), event);
+        QCoreApplication::sendEvent(activeFocusItem(), &event);
     } else {
-        defaultInputDevice()->sendFullKeyEvent(event);
+        defaultInputDevice()->sendFullKeyEvent(&event);
     }
 }

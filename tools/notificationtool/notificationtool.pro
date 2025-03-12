@@ -20,10 +20,3 @@ HEADERS += \
 SOURCES += \
      notificationtool.cpp \
      notificationmanagerproxy.cpp
-
-QMAKE_CXXFLAGS += \
-    -Werror \
-    -g \
-    -std=c++0x \
-    -fvisibility=hidden \
-    -fvisibility-inlines-hidden

@@ -1,6 +1,6 @@
 /***************************************************************************
 **
-** Copyright (c) 2013 - 2019 Jolla Ltd.
+** Copyright (c) 2013 - 2023 Jolla Ltd.
 ** Copyright (c) 2019 - 2020 Open Mobile Platform LLC.
 **
 ** This file is part of lipstick.
@@ -21,14 +21,12 @@
 #include "homeapplication.h"
 #include <QQmlParserStatus>
 #include <QtCompositorVersion>
-#if QTCOMPOSITOR_VERSION >= QT_VERSION_CHECK(5, 6, 0)
 #include <QWaylandQuickOutput>
-#endif
 #include <QWaylandQuickCompositor>
 #include <QWaylandSurfaceItem>
 #include <QPointer>
 #include <QTimer>
-#include <MGConfItem>
+#include <MDConfItem>
 #include <QDBusConnection>
 #include <QDBusContext>
 #include <QDBusMessage>
@@ -61,9 +59,7 @@ struct QueuedSetUpdatesEnabledCall
 };
 
 
-#if QTCOMPOSITOR_VERSION >= QT_VERSION_CHECK(5, 6, 0)
 typedef QWaylandClient WaylandClient;
-#endif
 
 class LIPSTICK_EXPORT LipstickCompositor
     : public QQuickWindow
@@ -89,6 +85,7 @@ class LIPSTICK_EXPORT LipstickCompositor
     Q_PROPERTY(QVariant orientationLock READ orientationLock NOTIFY orientationLockChanged)
     Q_PROPERTY(bool displayDimmed READ displayDimmed NOTIFY displayDimmedChanged)
     Q_PROPERTY(bool completed READ completed NOTIFY completedChanged)
+    Q_PROPERTY(bool synthesizeBackEvent READ synthesizeBackEvent WRITE setSynthesizeBackEvent NOTIFY synthesizeBackEventChanged)
 
 public:
     LipstickCompositor();
@@ -111,6 +108,23 @@ public:
     int topmostWindowId() const { return m_topmostWindowId; }
     void setTopmostWindowId(int id);
     int privateTopmostWindowProcessId() const { return m_topmostWindowProcessId; }
+    uint privateGetSetupActions() const {
+        /* Lipstick acquires graphics resources already in
+         * QGuiApplication construction phase and there is
+         * no practical way to delay this -> we need to return
+         * no-op from this method call handler and ensure that
+         * android compositor gets started by other means like
+         * by using suitable ExecStartPre=dummy_compositor
+         * command from lipstick.service file.
+         */
+        enum {
+            CompositorActionNone = 0,
+            CompositorActionStopHwc = (1<<0),
+            CompositorActionStartpHwc = (1<<1),
+            CompositorActionRestartpHwc = (1<<2),
+        };
+        return CompositorActionNone;
+    }
     QString privateTopmostWindowPolicyApplicationId() const { return m_topmostWindowPolicyApplicationId; }
 
     Qt::ScreenOrientation topmostWindowOrientation() const { return m_topmostWindowOrientation; }
@@ -137,7 +151,10 @@ public:
     Q_INVOKABLE void clearKeyboardFocus();
     Q_INVOKABLE void setDisplayOff();
     Q_INVOKABLE QVariant settingsValue(const QString &key, const QVariant &defaultValue = QVariant()) const
-        { return (key == "orientationLock") ? m_orientationLock->value(defaultValue) : MGConfItem("/lipstick/" + key).value(defaultValue); }
+    {
+        return (key == "orientationLock") ? m_orientationLock->value(defaultValue)
+                                          : MDConfItem("/lipstick/" + key).value(defaultValue);
+    }
     Q_INVOKABLE void openUrl(const QString &url)
     {
         openUrl(QUrl(url));
@@ -145,11 +162,15 @@ public:
     Q_INVOKABLE bool openUrl(const QUrl &);
 
     LipstickCompositorProcWindow *mapProcWindow(const QString &title, const QString &category, const QRect &);
-    LipstickCompositorProcWindow *mapProcWindow(const QString &title, const QString &category, const QRect &, QQuickItem *rootItem);
+    LipstickCompositorProcWindow *mapProcWindow(const QString &title, const QString &category, const QRect &,
+                                                QQuickItem *rootItem);
 
     QWaylandSurface *surfaceForId(int) const;
 
     bool completed();
+
+    bool synthesizeBackEvent() const;
+    void setSynthesizeBackEvent(bool enable);
 
     void setUpdatesEnabledNow(bool enabled);
     void setUpdatesEnabled(bool enabled);
@@ -190,6 +211,7 @@ signals:
     void displayAboutToBeOff();
 
     void completedChanged();
+    void synthesizeBackEventChanged();
 
     void showUnlockScreen();
 
@@ -222,11 +244,10 @@ private:
     friend class WindowPixmapItem;
     friend class WindowProperty;
 
+    void surfaceUnmapped(QWaylandSurface *);
     void surfaceUnmapped(LipstickCompositorWindow *item);
 
     int windowIdForLink(int, uint) const;
-
-    void surfaceUnmapped(QWaylandSurface *);
 
     void windowAdded(int);
     void windowRemoved(int);
@@ -239,9 +260,7 @@ private:
     static LipstickCompositor *m_instance;
 
 #ifndef LIPSTICK_UNIT_TEST_STUB
-#if QTCOMPOSITOR_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     QWaylandQuickOutput m_output;
-#endif
 #endif
 
     int m_totalWindowCount;
@@ -261,9 +280,10 @@ private:
     Qt::ScreenOrientation m_sensorOrientation;
     QOrientationSensor* m_orientationSensor;
     QPointer<QMimeData> m_retainedSelection;
-    MGConfItem *m_orientationLock;
+    MDConfItem *m_orientationLock;
     bool m_updatesEnabled;
     bool m_completed;
+    bool m_synthesizeBackEvent;
     int m_onUpdatesDisabledUnfocusedWindowId;
     LipstickRecorderManager *m_recorder;
     LipstickKeymap *m_keymap;

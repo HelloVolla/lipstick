@@ -22,7 +22,7 @@
 class HomeWindow;
 class PulseAudioControl;
 class VolumeKeyListener;
-class MGConfItem;
+class MDConfItem;
 
 class QDBusPendingCallWatcher;
 
@@ -64,7 +64,9 @@ public:
      *
      * \param parent the parent object
      */
-    explicit VolumeControl(QObject *parent = 0);
+    explicit VolumeControl(QObject *parent = nullptr);
+
+    VolumeControl(bool hwKeysCapability, QObject *parent = nullptr);
 
     /*!
      * Destroys the volume controller.
@@ -231,7 +233,7 @@ private:
     int m_maximumVolume;
 
     //! Stores audio warning acknowledgement state
-    MGConfItem *m_audioWarning;
+    MDConfItem *m_audioWarning;
 
     //! The current safe volume
     int m_safeVolume;

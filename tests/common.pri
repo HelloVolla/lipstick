@@ -21,13 +21,5 @@ CONFIG -= link_prl
 CONFIG += link_pkgconfig
 PKGCONFIG += mlite5 systemsettings
 
-QMAKE_CXXFLAGS += \
-    -Werror \
-    -g \
-    -std=c++0x \
-    -fPIC \
-    -fvisibility=hidden \
-    -fvisibility-inlines-hidden
-
 target.path = /opt/tests/lipstick-tests
 INSTALLS += target

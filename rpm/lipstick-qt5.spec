@@ -5,7 +5,7 @@ Name:       lipstick-qt5
 %define icondirectory %{_datadir}/icons/hicolor/86x86/apps
 
 Summary:    QML toolkit for homescreen creation
-Version:    0.36.0
+Version:    0.36.29
 Release:    1
 License:    LGPLv2
 URL:        https://github.com/sailfishos/lipstick/
@@ -20,14 +20,13 @@ Requires(postun): /sbin/ldconfig
 BuildRequires:  pkgconfig(Qt5Core)
 BuildRequires:  pkgconfig(Qt5DBus)
 BuildRequires:  pkgconfig(Qt5Quick) >= 5.2.1
-BuildRequires:  pkgconfig(Qt5Xml)
 BuildRequires:  pkgconfig(Qt5Sql)
 BuildRequires:  pkgconfig(Qt5Test)
 BuildRequires:  pkgconfig(Qt5Sensors)
 BuildRequires:  pkgconfig(contentaction5)
 BuildRequires:  pkgconfig(mlite5) >= 0.2.19
 BuildRequires:  pkgconfig(mce) >= 1.22.0
-BuildRequires:  pkgconfig(mce-qt5) >= 1.4.0
+BuildRequires:  pkgconfig(mce-qt5) >= 1.5.0
 BuildRequires:  pkgconfig(keepalive)
 BuildRequires:  pkgconfig(dsme_dbus_if) >= 0.63.2
 BuildRequires:  pkgconfig(thermalmanager_dbus_if)
@@ -40,6 +39,7 @@ BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(usb-moded-qt5) >= 1.8
 BuildRequires:  pkgconfig(systemsettings) >= 0.8.0
 BuildRequires:  pkgconfig(nemodevicelock)
+BuildRequires:  pkgconfig(nemoconnectivity)
 BuildRequires:  pkgconfig(sailfishusermanager)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  qt5-qttools-linguist
@@ -109,11 +109,9 @@ Translation files for the lipstick package.
 %build
 
 %qmake5 VERSION=%{version}
-
-make %{?_smp_mflags}
+%make_build
 
 %install
-rm -rf %{buildroot}
 mkdir -p %{buildroot}/%{icondirectory}
 %qmake5_install
 
@@ -125,7 +123,6 @@ install -m 644 -p %{SOURCE1} %{buildroot}%{_datadir}/mapplauncherd/privileges.d/
 %postun -p /sbin/ldconfig
 
 %files
-%defattr(-,root,root,-)
 %license LICENSE.LGPL
 %config %{_sysconfdir}/dbus-1/system.d/lipstick.conf
 %{_libdir}/lib%{name}.so.*
@@ -136,33 +133,26 @@ install -m 644 -p %{SOURCE1} %{buildroot}%{_datadir}/mapplauncherd/privileges.d/
 %dir %{icondirectory}
 
 %files devel
-%defattr(-,root,root,-)
 %{_includedir}/%{name}
 %{_libdir}/lib%{name}.so
 %{_libdir}/lib%{name}.prl
 %{_libdir}/pkgconfig/%{name}.pc
 
 %files tests
-%defattr(-,root,root,-)
 /opt/tests/lipstick-tests
 
 %files tools
-%defattr(-,root,root,-)
 %{_bindir}/notificationtool
 
 %files simplecompositor
-%defattr(-,root,root,-)
 %{_bindir}/simplecompositor
 %{_datadir}/lipstick/simplecompositor
 
 %files doc
-%defattr(-,root,root,-)
 %{_datadir}/doc/lipstick
 
 %files notification-doc
-%defattr(-,root,root,-)
 %{_datadir}/doc/lipstick-notification
 
 %files ts-devel
-%defattr(-,root,root,-)
 %{_datadir}/translations/source/*.ts

@@ -3,8 +3,6 @@ system(qdbusxml2cpp screenlock/screenlock.xml -a screenlock/screenlockadaptor -c
 system(qdbusxml2cpp shutdownscreen.xml -a shutdownscreenadaptor -c ShutdownScreenAdaptor -l ShutdownScreen -i shutdownscreen.h)
 system(qdbusxml2cpp net.connman.vpn.Agent.xml -a connmanvpnagent -c ConnmanVpnAgentAdaptor -l VpnAgent -i vpnagent.h)
 system(qdbusxml2cpp -c ConnmanVpnProxy -p connmanvpnproxy net.connman.vpn.xml -i qdbusxml2cpp_dbus_types.h)
-system(qdbusxml2cpp -c ConnmanManagerProxy -p connmanmanagerproxy net.connman.manager.xml -i qdbusxml2cpp_dbus_types.h)
-system(qdbusxml2cpp -c ConnmanServiceProxy -p connmanserviceproxy net.connman.service.xml -i qdbusxml2cpp_dbus_types.h)
 
 TEMPLATE = lib
 TARGET = lipstick-qt5
@@ -14,7 +12,7 @@ DEFINES += VERSION=\\\"$${VERSION}\\\"
 DEFINES += MESA_EGL_NO_X11_HEADERS
 DEFINES += EGL_NO_X11
 
-CONFIG += qt wayland-scanner c++11
+CONFIG += qt wayland-scanner
 INSTALLS = target ts_install engineering_english_install
 target.path = $$[QT_INSTALL_LIBS]
 
@@ -51,9 +49,7 @@ PUBLICHEADERS += \
     shutdownscreen.h \
     devicestate/displaystate.h \
     devicestate/devicestate.h \
-    devicestate/thermal.h \
-    vpnagent.h \
-    connectivitymonitor.h
+    vpnagent.h
 
 INSTALLS += publicheaderfiles dbus_policy
 publicheaderfiles.files = $$PUBLICHEADERS
@@ -82,13 +78,9 @@ HEADERS += \
     qdbusxml2cpp_dbus_types.h \
     connmanvpnagent.h \
     connmanvpnproxy.h \
-    connmanmanagerproxy.h \
-    connmanserviceproxy.h \
     notifications/thermalnotifier.h \
     devicestate/devicestate_p.h \
     devicestate/displaystate_p.h \
-    devicestate/ipcinterface_p.h \
-    devicestate/thermal_p.h \
     logging.h \
 
 SOURCES += \
@@ -123,21 +115,16 @@ SOURCES += \
     shutdownscreen.cpp \
     shutdownscreenadaptor.cpp \
     vpnagent.cpp \
-    connectivitymonitor.cpp \
     connmanvpnagent.cpp \
     connmanvpnproxy.cpp \
-    connmanmanagerproxy.cpp \
-    connmanserviceproxy.cpp \
     lipstickapi.cpp \
     screenshotservice.cpp \
     notifications/thermalnotifier.cpp \
     devicestate/displaystate.cpp \
     devicestate/devicestate.cpp \
-    devicestate/thermal.cpp \
-    devicestate/ipcinterface.cpp \
     logging.cpp \
 
-CONFIG += link_pkgconfig mobility qt warn_on depend_includepath qmake_cache target_qt
+CONFIG += link_pkgconfig qt warn_on depend_includepath qmake_cache target_qt
 CONFIG -= link_prl
 PKGCONFIG += \
     dbus-1 \
@@ -150,6 +137,7 @@ PKGCONFIG += \
     mce \
     mce-qt5 \
     nemodevicelock \
+    nemoconnectivity \
     ngf-qt5 \
     systemsettings \
     thermalmanager_dbus_if \
@@ -169,7 +157,7 @@ packagesExist(contentaction5) {
     warning("contentaction doesn't exist; falling back to exec - this may not work so great")
 }
 
-QT += dbus xml qml quick sql gui gui-private sensors
+QT += dbus qml quick sql gui gui-private sensors
 
 QMAKE_CXXFLAGS += \
     -Wfatal-errors \

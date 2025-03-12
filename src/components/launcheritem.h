@@ -94,6 +94,7 @@ public:
     bool isValid() const;
     bool isLaunching() const;
     bool isStillValid();
+    bool dBusActivatable() const;
     bool dBusActivated() const;
     MRemoteAction remoteAction(const QStringList &arguments = QStringList()) const;
 
@@ -126,6 +127,8 @@ public:
     Q_INVOKABLE QString readValue(const QString &key) const;
 
     Q_INVOKABLE bool canOpenMimeType(const QString &mimeType);
+
+    void invalidateCaches();
 
 signals:
     void itemChanged();

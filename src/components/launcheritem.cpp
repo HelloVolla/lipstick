@@ -57,7 +57,8 @@ const auto SailjailGetAppInfo = QStringLiteral("GetAppInfo");
 const auto SailjailInvalidName = QStringLiteral("Invalid application name: ");
 const auto SailjailInfoKeyMode = QStringLiteral("Mode");
 const auto SailjailModeNone = QStringLiteral("None");
-const auto DBusActivatableKey = QStringLiteral("Desktop Entry/DBusActivatable");
+const auto DesktopEntryGroup = QStringLiteral("Desktop Entry");
+const auto DBusActivatableKey = QStringLiteral("DBusActivatable");
 
 typedef QMap<QString, QDBusVariant> PropertyMap;
 
@@ -66,10 +67,7 @@ LauncherItem::LauncherItem(const QString &filePath, QObject *parent)
     , m_isLaunching(false)
     , m_isUpdating(false)
     , m_isTemporary(false)
-    , m_packageName("")
     , m_updatingProgress(-1)
-    , m_customTitle("")
-    , m_customIconFilename("")
     , m_serial(0)
     , m_isBlacklisted(false)
     , m_mimeTypesPopulated(false)
@@ -134,8 +132,10 @@ void LauncherItem::setFilePath(const QString &filePath)
     }
 
     if (!m_desktopEntry.isNull() && m_desktopEntry->isValid()) {
-        const QString organisation = m_desktopEntry->value(QStringLiteral("X-Sailjail"), QStringLiteral("OrganizationName"));
-        const QString application = m_desktopEntry->value(QStringLiteral("X-Sailjail"), QStringLiteral("ApplicationName"));
+        const QString organisation = m_desktopEntry->value(QStringLiteral("X-Sailjail"),
+                                                           QStringLiteral("OrganizationName"));
+        const QString application = m_desktopEntry->value(QStringLiteral("X-Sailjail"),
+                                                          QStringLiteral("ApplicationName"));
 
         if (!organisation.isEmpty() && !application.isEmpty()) {
             m_serviceName = organisation + QLatin1Char('.') + application;
@@ -241,10 +241,17 @@ QString LauncherItem::exec() const
     return !m_desktopEntry.isNull() ? m_desktopEntry->exec() : QString();
 }
 
+bool LauncherItem::dBusActivatable() const
+{
+    QString activatable = m_desktopEntry->value(DesktopEntryGroup, DBusActivatableKey);
+    if (activatable.isEmpty())
+        activatable = m_desktopEntry->value(DesktopEntryGroup, QStringLiteral("X-") + DBusActivatableKey);
+    return activatable == QLatin1String("true");
+}
+
 bool LauncherItem::dBusActivated() const
 {
-    return !m_desktopEntry.isNull() && (!m_desktopEntry->xMaemoService().isEmpty()
-            || m_desktopEntry->value(DBusActivatableKey) == QLatin1String("true"));
+    return !m_desktopEntry.isNull() && (!m_desktopEntry->xMaemoService().isEmpty() || dBusActivatable());
 }
 
 MRemoteAction LauncherItem::remoteAction(const QStringList &arguments) const
@@ -263,9 +270,11 @@ MRemoteAction LauncherItem::remoteAction(const QStringList &arguments) const
                         method.left(period),
                         method.mid(period + 1),
                         { QVariant::fromValue(arguments) });
-        } else if (!m_serviceName.isEmpty()
-                && m_desktopEntry->value(DBusActivatableKey) == QLatin1String("true")) {
-            const QString path = QLatin1Char('/') + QString(m_serviceName).replace(QLatin1Char('.'), QLatin1Char('/')).replace(QLatin1Char('-'), QLatin1Char('_'));
+        } else if (!m_serviceName.isEmpty() && dBusActivatable()) {
+            const QString path = QLatin1Char('/')
+                    + (QString(m_serviceName)
+                       .replace(QLatin1Char('.'), QLatin1Char('/'))
+                       .replace(QLatin1Char('-'), QLatin1Char('_')));
             const QString interface = QStringLiteral("org.freedesktop.Application");
 
             QVariantList dBusArguments;
@@ -342,7 +351,7 @@ bool LauncherItem::isSandboxed() const
     if (m_sandboxingInfoFetched) {
         return m_sandboxed;
     } else {
-        return !m_desktopEntry.isNull() ? m_desktopEntry->isSandboxed() : false;
+        return !m_desktopEntry.isNull() && m_desktopEntry->isSandboxed();
     }
 }
 
@@ -359,7 +368,8 @@ bool LauncherItem::isLaunching() const
 void LauncherItem::setIsLaunching(bool isLaunching)
 {
     if (isLaunching) {
-        // This is a failsafe to allow launching again after 5 seconds in case the application crashes on startup and no window is ever created
+        // This is a failsafe to allow launching again after 5 seconds in case the
+        // application crashes on startup and no window is ever created
         m_launchingTimeout.start(5000, this);
     } else {
         m_launchingTimeout.stop();
@@ -562,6 +572,11 @@ bool LauncherItem::canOpenMimeType(const QString &mimeType)
     return false;
 }
 
+void LauncherItem::invalidateCaches()
+{
+    m_mimeTypesPopulated = false;
+    m_sandboxingInfoFetched = false;
+}
 
 void LauncherItem::timerEvent(QTimerEvent *event)
 {

@@ -19,7 +19,7 @@
 #include "volumecontrol.h"
 #include "pulseaudiocontrol_stub.h"
 #include "closeeventeater_stub.h"
-#include "mgconfitem_stub.h"
+#include "mdconfitem_stub.h"
 #include "lipstickqmlpath_stub.h"
 
 extern "C"
@@ -99,7 +99,7 @@ void Ut_VolumeControl::init()
 {
     gPulseAudioControlStub->stubReset();
 
-    volumeControl = new VolumeControl;
+    volumeControl = new VolumeControl(true);
     volumeControl->setVolume(5, 10);
 }
 

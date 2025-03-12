@@ -19,7 +19,7 @@
 #include "lipstickglobal.h"
 #include <QObject>
 #include <QHash>
-#include <MGConfItem>
+#include <MDConfItem>
 #include <profilecontrol.h>
 
 class LipstickNotification;
@@ -35,42 +35,13 @@ namespace Ngf {
 class LIPSTICK_EXPORT NotificationFeedbackPlayer : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(int minimumPriority READ minimumPriority WRITE setMinimumPriority NOTIFY minimumPriorityChanged)
 
 public:
     explicit NotificationFeedbackPlayer(QObject *parent = 0);
 
-    /*!
-     * Returns the minimum priority of notifications for which a feedback should be played
-     *
-     * \return the minimum priority of notifications for which a feedback should be played
-     */
-    int minimumPriority() const;
-
-    /*!
-     * Sets the minimum priority of notifications for which a feedback should be played
-     *
-     * \param minimumPriority the minimum priority of notifications for which a feedback should be played
-     */
-    void setMinimumPriority(int minimumPriority);
-
     bool doNotDisturbMode() const;
 
-signals:
-    //! Emitted when the minimum priority of notifications for which a feedback should be played has changed
-    void minimumPriorityChanged();
-
-private slots:
-    //! Initializes the feedback player
-    void init();
-
-    /*!
-     * Adds the notification with the given ID.
-     *
-     * \param id the ID of the notification to be added
-     */
-    void addNotification(uint id);
-
+public slots:
     /*!
      * Removes the notification with the given ID.
      *
@@ -78,9 +49,19 @@ private slots:
      */
     void removeNotification(uint id);
 
+private slots:
+    void init();
+
+    /*!
+     * Adds the notification with the given ID.
+     *
+     * \param id the ID of the notification to be added
+     */
+    bool addNotification(uint id);
+
 private:
     //! Check whether feedbacks should be enabled for the given notification
-    bool isEnabled(LipstickNotification *notification, int minimumPriority);
+    bool isEnabled(LipstickNotification *notification);
 
     //! Non-graphical feedback player
     Ngf::Client *m_ngfClient;
@@ -88,10 +69,7 @@ private:
     //! A mapping between notification IDs and NGF play IDs.
     QMultiHash<LipstickNotification *, uint> m_idToEventId;
 
-    //! The minimum priority of notifications for which a feedback should be played
-    int m_minimumPriority;
-
-    MGConfItem m_doNotDisturbSetting;
+    MDConfItem m_doNotDisturbSetting;
     ProfileControl m_profileControl;
 
     friend class NotificationPreviewPresenter;

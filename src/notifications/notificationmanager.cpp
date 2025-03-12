@@ -273,15 +273,16 @@ NotificationManager *NotificationManager::instance(bool owner)
     return s_instance;
 }
 
-NotificationManager::NotificationManager(QObject *parent, bool owner) :
-    QObject(parent),
-    QDBusContext(),
-    m_previousNotificationID(0),
-    m_categoryDefinitionStore(new CategoryDefinitionStore(CATEGORY_DEFINITION_FILE_DIRECTORY, MAX_CATEGORY_DEFINITION_FILES, this)),
-    m_androidPriorityStore(new AndroidPriorityStore(ANDROID_PRIORITY_DEFINITION_PATH, this)),
-    m_database(new QSqlDatabase),
-    m_committed(true),
-    m_nextExpirationTime(0)
+NotificationManager::NotificationManager(QObject *parent, bool owner)
+    : QObject(parent),
+      QDBusContext(),
+      m_previousNotificationID(0),
+      m_categoryDefinitionStore(new CategoryDefinitionStore(CATEGORY_DEFINITION_FILE_DIRECTORY,
+                                                            MAX_CATEGORY_DEFINITION_FILES, this)),
+      m_androidPriorityStore(new AndroidPriorityStore(ANDROID_PRIORITY_DEFINITION_PATH, this)),
+      m_database(new QSqlDatabase),
+      m_committed(true),
+      m_nextExpirationTime(0)
 {
     if (owner) {
         qDBusRegisterMetaType<QVariantHash>();
@@ -292,10 +293,13 @@ NotificationManager::NotificationManager(QObject *parent, bool owner) :
         QDBusConnection::sessionBus().registerObject("/org/freedesktop/Notifications", this);
         QDBusConnection::sessionBus().registerService("org.freedesktop.Notifications");
 
-        connect(m_categoryDefinitionStore, SIGNAL(categoryDefinitionUninstalled(QString)), this, SLOT(removeNotificationsWithCategory(QString)));
-        connect(m_categoryDefinitionStore, SIGNAL(categoryDefinitionModified(QString)), this, SLOT(updateNotificationsWithCategory(QString)));
+        connect(m_categoryDefinitionStore, SIGNAL(categoryDefinitionUninstalled(QString)),
+                this, SLOT(removeNotificationsWithCategory(QString)));
+        connect(m_categoryDefinitionStore, SIGNAL(categoryDefinitionModified(QString)),
+                this, SLOT(updateNotificationsWithCategory(QString)));
 
-        // Commit the modifications to the database 10 seconds after the last modification so that writing to disk doesn't affect user experience
+        // Commit the modifications to the database 10 seconds after the last modification so that writing
+        // to disk doesn't affect user experience
         m_databaseCommitTimer.setInterval(CommitDelay);
         m_databaseCommitTimer.setSingleShot(true);
         connect(&m_databaseCommitTimer, SIGNAL(timeout()), this, SLOT(commit()));
@@ -370,7 +374,8 @@ uint NotificationManager::Notify(const QString &appName, uint replacesId, const 
     } else {
         setDelayedReply(true);
         ClientIdentifier *identifier = new ClientIdentifier(this, connection(), message());
-        connect(identifier, &ClientIdentifier::finished, this, &NotificationManager::identifiedNotify, Qt::QueuedConnection);
+        connect(identifier, &ClientIdentifier::finished, this, &NotificationManager::identifiedNotify,
+                Qt::QueuedConnection);
     }
     return id;
 }
@@ -389,7 +394,8 @@ void NotificationManager::identifiedNotify()
     QVariantHash hints;
     hintsArg >> hints;
     int expireTimeout = arguments.at(7).toInt();
-    uint id = handleNotify(identifier->clientPid(), appName, replacesId, appIcon, summary, body, actions, hints, expireTimeout);
+    uint id = handleNotify(identifier->clientPid(), appName, replacesId, appIcon, summary, body,
+                           actions, hints, expireTimeout);
     if (identifier->message().isReplyRequired()) {
         QDBusMessage reply;
         if (id == 0) {
@@ -408,9 +414,9 @@ uint NotificationManager::handleNotify(int clientPid, const QString &appName, ui
                                        const QString &summary, const QString &body, const QStringList &actions,
                                        const QVariantHash &hints, int expireTimeout)
 {
-    NOTIFICATIONS_DEBUG("clientPid:" << clientPid << "appName:" << appName << "replacesId:" << replacesId << "appIcon:" << appIcon
-                        << "summary:" << summary << "body:" << body << "actions:" << actions << "hints:" << hints << "expireTimeout:" << expireTimeout);
-
+    NOTIFICATIONS_DEBUG("clientPid:" << clientPid << "appName:" << appName << "replacesId:" << replacesId
+                        << "appIcon:" << appIcon << "summary:" << summary << "body:" << body << "actions:"
+                        << actions << "hints:" << hints << "expireTimeout:" << expireTimeout);
     if (replacesId != 0 && !m_notifications.contains(replacesId)) {
         replacesId = 0;
     }
@@ -482,7 +488,6 @@ uint NotificationManager::handleNotify(int clientPid, const QString &appName, ui
         }
     }
 
-
     QPair<QString, QString> pidProperties;
     bool androidOrigin(false);
     if (clientPid > 0) {
@@ -532,6 +537,7 @@ uint NotificationManager::handleNotify(int clientPid, const QString &appName, ui
         notification->setActions(notificationData.actions());
         notification->setHints(notificationData.hints());
         notification->setExpireTimeout(notificationData.expireTimeout());
+        notification->setRestored(false);
     } else {
         notification = new LipstickNotification(notificationData);
         notification->setParent(this);
@@ -604,6 +610,7 @@ uint NotificationManager::handleNotify(int clientPid, const QString &appName, ui
     }
 
     notification->setHints(hints_);
+    notification->setPrivilegedSource(clientIsPrivileged);
 
     publish(notification, replacesId);
 
@@ -617,6 +624,7 @@ void NotificationManager::deleteNotification(uint id)
     execSQL(QString("DELETE FROM notifications WHERE id=?"), params);
     execSQL(QString("DELETE FROM actions WHERE id=?"), params);
     execSQL(QString("DELETE FROM hints WHERE id=?"), params);
+    execSQL(QString("DELETE FROM internal_hints WHERE id=?"), params);
     execSQL(QString("DELETE FROM expiration WHERE id=?"), params);
 }
 
@@ -627,7 +635,8 @@ void NotificationManager::CloseNotification(uint id, NotificationClosedReason cl
     } else {
         setDelayedReply(true);
         ClientIdentifier *identifier = new ClientIdentifier(this, connection(), message());
-        connect(identifier, &ClientIdentifier::finished, this, &NotificationManager::identifiedCloseNotification, Qt::QueuedConnection);
+        connect(identifier, &ClientIdentifier::finished,
+                this, &NotificationManager::identifiedCloseNotification, Qt::QueuedConnection);
     }
 }
 
@@ -709,7 +718,8 @@ void NotificationManager::markNotificationDisplayed(uint id)
                 // Insert the timeout into the expiration table, or leave the existing value if already present
                 const qint64 currentTime(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
                 const qint64 expireAt(currentTime + timeout);
-                execSQL(QString("INSERT OR IGNORE INTO expiration(id, expire_at) VALUES(?, ?)"), QVariantList() << id << expireAt);
+                execSQL(QString("INSERT OR IGNORE INTO expiration(id, expire_at) VALUES(?, ?)"),
+                        QVariantList() << id << expireAt);
 
                 if (m_nextExpirationTime == 0 || (expireAt < m_nextExpirationTime)) {
                     // This will be the next notification to expire - update the timer
@@ -741,7 +751,8 @@ NotificationList NotificationManager::GetNotifications(const QString &owner)
     } else {
         setDelayedReply(true);
         ClientIdentifier *identifier = new ClientIdentifier(this, connection(), message());
-        connect(identifier, &ClientIdentifier::finished, this, &NotificationManager::identifiedGetNotifications, Qt::QueuedConnection);
+        connect(identifier, &ClientIdentifier::finished,
+                this, &NotificationManager::identifiedGetNotifications, Qt::QueuedConnection);
     }
     return notificationList;
 }
@@ -768,7 +779,8 @@ NotificationList NotificationManager::handleGetNotifications(int clientPid, cons
     QHash<uint, LipstickNotification *>::const_iterator it = m_notifications.constBegin(), end = m_notifications.constEnd();
     for ( ; it != end; ++it) {
         LipstickNotification *notification = it.value();
-        if (notification->owner() == owner || (!callerProcessName.isEmpty() && (notification->owner() == callerProcessName))) {
+        if (notification->owner() == owner
+                || (!callerProcessName.isEmpty() && (notification->owner() == callerProcessName))) {
             notificationList.append(notification);
         }
     }
@@ -784,7 +796,8 @@ NotificationList NotificationManager::GetNotificationsByCategory(const QString &
     } else {
         setDelayedReply(true);
         ClientIdentifier *identifier = new ClientIdentifier(this, connection(), message());
-        connect(identifier, &ClientIdentifier::finished, this, &NotificationManager::identifiedGetNotificationsByCategory, Qt::QueuedConnection);
+        connect(identifier, &ClientIdentifier::finished,
+                this, &NotificationManager::identifiedGetNotificationsByCategory, Qt::QueuedConnection);
     }
     return notificationList;
 }
@@ -808,7 +821,8 @@ NotificationList NotificationManager::handleGetNotificationsByCategory(int clien
     NOTIFICATIONS_DEBUG("clientPid:" << clientPid << "category:" << category);
     QList<LipstickNotification *> notificationList;
     if (processIsPrivileged(clientPid)) {
-        QHash<uint, LipstickNotification *>::const_iterator it = m_notifications.constBegin(), end = m_notifications.constEnd();
+        QHash<uint, LipstickNotification *>::const_iterator it = m_notifications.constBegin(),
+                end = m_notifications.constEnd();
         for ( ; it != end; ++it) {
             LipstickNotification *notification = it.value();
             if (notification->category() == category) {
@@ -869,9 +883,7 @@ void NotificationManager::updateNotificationsWithCategory(const QString &categor
 
     foreach (LipstickNotification *notification, categoryNotifications) {
         // Mark the notification as restored to avoid showing the preview banner again
-        QVariantHash hints = notification->hints();
-        hints.insert(LipstickNotification::HINT_RESTORED, true);
-        notification->setHints(hints);
+        notification->setRestored(true);
 
         // Update the category properties and re-publish
         applyCategoryDefinition(notification);
@@ -967,6 +979,12 @@ void NotificationManager::publish(const LipstickNotification *notification, uint
         execSQL("INSERT INTO hints VALUES (?, ?, ?)", QVariantList() << id << hit.key() << hit.value());
     }
 
+    const QVariantHash internalHints(notification->internalHints());
+    hit = internalHints.constBegin(), hend = internalHints.constEnd();
+    for ( ; hit != hend; ++hit) {
+        execSQL("INSERT INTO internal_hints VALUES (?, ?, ?)", QVariantList() << id << hit.key() << hit.value());
+    }
+
     NOTIFICATIONS_DEBUG("PUBLISH:" << notification->appName() << notification->appIcon() << notification->summary()
                         << notification->body() << notification->actions() << notification->hints()
                         << notification->expireTimeout() << "->" << id);
@@ -994,7 +1012,8 @@ void NotificationManager::restoreNotifications(bool update)
 
 bool NotificationManager::connectToDatabase()
 {
-    QString databasePath = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/system/privileged/Notifications");
+    QString databasePath = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+            + QStringLiteral("/system/privileged/Notifications");
     if (!QDir::root().exists(databasePath)) {
         QDir::root().mkpath(databasePath);
     }
@@ -1052,6 +1071,7 @@ bool NotificationManager::checkTableValidity()
     bool recreateNotificationsTable = false;
     bool recreateActionsTable = false;
     bool recreateHintsTable = false;
+    bool recreateInternalHintsTable = false;
     bool recreateExpirationTable = false;
 
     const int databaseVersion(schemaVersion());
@@ -1062,6 +1082,7 @@ bool NotificationManager::checkTableValidity()
         recreateNotificationsTable = true;
         recreateActionsTable = true;
         recreateHintsTable = true;
+        recreateInternalHintsTable = true;
         recreateExpirationTable = true;
     } else {
         if (databaseVersion == 3) {
@@ -1077,12 +1098,13 @@ bool NotificationManager::checkTableValidity()
         } else {
             recreateNotificationsTable = !verifyTableColumns("notifications",
                                                              QStringList() << "id" << "app_name" << "app_icon" << "summary"
-                                                             << "body" << "expire_timeout" << "disambiguated_app_name" << "explicit_app_name"
-                                                             << "app_icon_origin");
+                                                             << "body" << "expire_timeout" << "disambiguated_app_name"
+                                                             << "explicit_app_name" << "app_icon_origin");
             recreateActionsTable = !verifyTableColumns("actions", QStringList() << "id" << "action" << "display_name");
         }
 
         recreateHintsTable = !verifyTableColumns("hints", QStringList() << "id" << "hint" << "value");
+        recreateInternalHintsTable = !verifyTableColumns("internal_hints", QStringList() << "id" << "hint" << "value");
         recreateExpirationTable = !verifyTableColumns("expiration", QStringList() << "id" << "expire_at");
     }
 
@@ -1099,6 +1121,10 @@ bool NotificationManager::checkTableValidity()
     if (recreateHintsTable) {
         qWarning() << "Recreating hints table";
         result &= recreateTable("hints", "id INTEGER, hint TEXT, value TEXT, PRIMARY KEY(id, hint)");
+    }
+    if (recreateInternalHintsTable) {
+        qWarning() << "Recreating internal hints table";
+        result &= recreateTable("internal_hints", "id INTEGER, hint TEXT, value TEXT, PRIMARY KEY(id, hint)");
     }
     if (recreateExpirationTable) {
         qWarning() << "Recreating expiration table";
@@ -1174,28 +1200,29 @@ void NotificationManager::fetchData(bool update)
     // Gather actions for each notification
     QSqlQuery actionsQuery("SELECT * FROM actions", *m_database);
     QSqlRecord actionsRecord = actionsQuery.record();
-    int actionsTableIdFieldIndex = actionsRecord.indexOf("id");
-    int actionsTableActionFieldIndex = actionsRecord.indexOf("action");
-    int actionsTableNameFieldIndex = actionsRecord.indexOf("display_name");
+    int actionsTableIdIndex = actionsRecord.indexOf("id");
+    int actionsTableActionIndex = actionsRecord.indexOf("action");
+    int actionsTableNameIndex = actionsRecord.indexOf("display_name");
 
     QHash<uint, QStringList> actions;
     while (actionsQuery.next()) {
-        const uint id = actionsQuery.value(actionsTableIdFieldIndex).toUInt();
-        actions[id].append(actionsQuery.value(actionsTableActionFieldIndex).toString());
-        actions[id].append(actionsQuery.value(actionsTableNameFieldIndex).toString());
+        const uint id = actionsQuery.value(actionsTableIdIndex).toUInt();
+        actions[id].append(actionsQuery.value(actionsTableActionIndex).toString());
+        actions[id].append(actionsQuery.value(actionsTableNameIndex).toString());
     }
 
     // Gather hints for each notification
     QSqlQuery hintsQuery("SELECT * FROM hints", *m_database);
     QSqlRecord hintsRecord = hintsQuery.record();
-    int hintsTableIdFieldIndex = hintsRecord.indexOf("id");
-    int hintsTableHintFieldIndex = hintsRecord.indexOf("hint");
-    int hintsTableValueFieldIndex = hintsRecord.indexOf("value");
+    int hintsTableIdIndex = hintsRecord.indexOf("id");
+    int hintsTableHintIndex = hintsRecord.indexOf("hint");
+    int hintsTableValueIndex = hintsRecord.indexOf("value");
     QHash<uint, QVariantHash> hints;
+
     while (hintsQuery.next()) {
-        const uint id = hintsQuery.value(hintsTableIdFieldIndex).toUInt();
-        const QString hintName(hintsQuery.value(hintsTableHintFieldIndex).toString());
-        const QVariant hintValue(hintsQuery.value(hintsTableValueFieldIndex));
+        const uint id = hintsQuery.value(hintsTableIdIndex).toUInt();
+        const QString hintName(hintsQuery.value(hintsTableHintIndex).toString());
+        const QVariant hintValue(hintsQuery.value(hintsTableValueIndex));
 
         QVariant value;
         if (hintName == LipstickNotification::HINT_TIMESTAMP) {
@@ -1210,15 +1237,31 @@ void NotificationManager::fetchData(bool update)
         hints[id].insert(hintName, value);
     }
 
+    // Gather the internal hints
+    QSqlQuery internalHintsQuery("SELECT * FROM internal_hints", *m_database);
+    QSqlRecord internalHintsRecord = internalHintsQuery.record();
+    int internalHintsTableIdIndex = internalHintsRecord.indexOf("id");
+    int internalHintsTableHintIndex = internalHintsRecord.indexOf("hint");
+    int internalHintsTableValueIndex = internalHintsRecord.indexOf("value");
+    QHash<uint, QVariantHash> internalHints;
+
+    while (internalHintsQuery.next()) {
+        const uint id = internalHintsQuery.value(internalHintsTableIdIndex).toUInt();
+        const QString hintName(internalHintsQuery.value(internalHintsTableHintIndex).toString());
+        const QVariant hintValue(internalHintsQuery.value(internalHintsTableValueIndex));
+
+        internalHints[id].insert(hintName, hintValue);
+    }
+
     // Gather expiration times for displayed notifications
     QSqlQuery expirationQuery("SELECT * FROM expiration", *m_database);
     QSqlRecord expirationRecord = expirationQuery.record();
-    int expirationTableIdFieldIndex = expirationRecord.indexOf("id");
-    int expirationTableExpireAtFieldIndex = expirationRecord.indexOf("expire_at");
+    int expirationTableIdIndex = expirationRecord.indexOf("id");
+    int expirationTableExpireAtIndex = expirationRecord.indexOf("expire_at");
     QHash<uint, qint64> expireAt;
     while (expirationQuery.next()) {
-        const uint id = expirationQuery.value(expirationTableIdFieldIndex).toUInt();
-        expireAt.insert(id, expirationQuery.value(expirationTableExpireAtFieldIndex).value<qint64>());
+        const uint id = expirationQuery.value(expirationTableIdIndex).toUInt();
+        expireAt.insert(id, expirationQuery.value(expirationTableExpireAtIndex).value<qint64>());
     }
 
     const qint64 currentTime(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
@@ -1231,26 +1274,26 @@ void NotificationManager::fetchData(bool update)
     // Create the notifications
     QSqlQuery notificationsQuery("SELECT * FROM notifications", *m_database);
     QSqlRecord notificationsRecord = notificationsQuery.record();
-    int notificationsTableIdFieldIndex = notificationsRecord.indexOf("id");
-    int notificationsTableAppNameFieldIndex = notificationsRecord.indexOf("app_name");
-    int notificationsTableExplicitAppNameFieldIndex = notificationsRecord.indexOf("explicit_app_name");
-    int notificationsTableDisambiguatedAppNameFieldIndex = notificationsRecord.indexOf("disambiguated_app_name");
-    int notificationsTableAppIconFieldIndex = notificationsRecord.indexOf("app_icon");
-    int notificationsTableAppIconOriginFieldIndex = notificationsRecord.indexOf("app_icon_origin");
-    int notificationsTableSummaryFieldIndex = notificationsRecord.indexOf("summary");
-    int notificationsTableBodyFieldIndex = notificationsRecord.indexOf("body");
-    int notificationsTableExpireTimeoutFieldIndex = notificationsRecord.indexOf("expire_timeout");
+    int notificationsTableIdIndex = notificationsRecord.indexOf("id");
+    int notificationsTableAppNameIndex = notificationsRecord.indexOf("app_name");
+    int notificationsTableExplicitAppNameIndex = notificationsRecord.indexOf("explicit_app_name");
+    int notificationsTableDisambiguatedAppNameIndex = notificationsRecord.indexOf("disambiguated_app_name");
+    int notificationsTableAppIconIndex = notificationsRecord.indexOf("app_icon");
+    int notificationsTableAppIconOriginIndex = notificationsRecord.indexOf("app_icon_origin");
+    int notificationsTableSummaryIndex = notificationsRecord.indexOf("summary");
+    int notificationsTableBodyIndex = notificationsRecord.indexOf("body");
+    int notificationsTableExpireTimeoutIndex = notificationsRecord.indexOf("expire_timeout");
 
     while (notificationsQuery.next()) {
-        const uint id = notificationsQuery.value(notificationsTableIdFieldIndex).toUInt();
-        QString appName = notificationsQuery.value(notificationsTableAppNameFieldIndex).toString();
-        QString explicitAppName = notificationsQuery.value(notificationsTableExplicitAppNameFieldIndex).toString();
-        QString disambiguatedAppName = notificationsQuery.value(notificationsTableDisambiguatedAppNameFieldIndex).toString();
-        QString appIcon = notificationsQuery.value(notificationsTableAppIconFieldIndex).toString();
-        int appIconOrigin = notificationsQuery.value(notificationsTableAppIconOriginFieldIndex).toInt();
-        QString summary = notificationsQuery.value(notificationsTableSummaryFieldIndex).toString();
-        QString body = notificationsQuery.value(notificationsTableBodyFieldIndex).toString();
-        int expireTimeout = notificationsQuery.value(notificationsTableExpireTimeoutFieldIndex).toInt();
+        const uint id = notificationsQuery.value(notificationsTableIdIndex).toUInt();
+        QString appName = notificationsQuery.value(notificationsTableAppNameIndex).toString();
+        QString explicitAppName = notificationsQuery.value(notificationsTableExplicitAppNameIndex).toString();
+        QString disambiguatedAppName = notificationsQuery.value(notificationsTableDisambiguatedAppNameIndex).toString();
+        QString appIcon = notificationsQuery.value(notificationsTableAppIconIndex).toString();
+        int appIconOrigin = notificationsQuery.value(notificationsTableAppIconOriginIndex).toInt();
+        QString summary = notificationsQuery.value(notificationsTableSummaryIndex).toString();
+        QString body = notificationsQuery.value(notificationsTableBodyIndex).toString();
+        int expireTimeout = notificationsQuery.value(notificationsTableExpireTimeoutIndex).toInt();
 
         const QStringList &notificationActions = actions[id];
 
@@ -1261,9 +1304,6 @@ void NotificationManager::fetchData(bool update)
                                 << notificationHints << expireTimeout << "->" << id);
             transientIds.append(id);
             continue;
-        } else {
-            // Mark this notification as restored
-            notificationHints.insert(LipstickNotification::HINT_RESTORED, true);
         }
 
         bool expired = false;
@@ -1281,6 +1321,8 @@ void NotificationManager::fetchData(bool update)
                                                                       id, QString(), summary, body, notificationActions,
                                                                       notificationHints, expireTimeout, this);
         notification->setAppIcon(appIcon, appIconOrigin);
+        notification->setInternalHints(internalHints[id]);
+        notification->setRestored(true);
         m_notifications.insert(id, notification);
 
         if (id > m_previousNotificationID) {
@@ -1335,7 +1377,8 @@ void NotificationManager::fetchData(bool update)
     }
 
     foreach (LipstickNotification *n, m_notifications) {
-        connect(n, SIGNAL(actionInvoked(QString)), this, SLOT(invokeAction(QString)), Qt::QueuedConnection);
+        connect(n, &LipstickNotification::actionInvoked,
+                this, &NotificationManager::invokeAction, Qt::QueuedConnection);
         connect(n, SIGNAL(removeRequested()), this, SLOT(removeNotificationIfUserRemovable()), Qt::QueuedConnection);
 #ifdef DEBUG_NOTIFICATIONS
         const uint id = n->id();
@@ -1388,22 +1431,31 @@ void NotificationManager::execSQL(const QString &command, const QVariantList &ar
     m_databaseCommitTimer.start();
 }
 
-void NotificationManager::invokeAction(const QString &action)
+void NotificationManager::invokeAction(const QString &action, const QString &actionText)
 {
     LipstickNotification *notification = qobject_cast<LipstickNotification *>(sender());
     if (notification != 0) {
         uint id = m_notifications.key(notification, 0);
         if (id > 0) {
-            QString remoteAction = notification->hints().value(QString(LipstickNotification::HINT_REMOTE_ACTION_PREFIX) + action).toString();
+            QString actionHint = LipstickNotification::HINT_REMOTE_ACTION_PREFIX + action;
+            QString remoteAction = notification->hints().value(actionHint).toString();
+
             if (!remoteAction.isEmpty()) {
                 NOTIFICATIONS_DEBUG("INVOKE REMOTE ACTION:" << action << id);
 
-                emit remoteActionActivated(remoteAction);
+                // If we need to support text actions with empty parameter, we need to fetch the action type from
+                // the notification, but likely this is enough for the action type
+                if (actionText.isEmpty()) {
+                    emit remoteActionActivated(remoteAction, notification->privilegedSource());
+                } else {
+                    emit remoteTextActionActivated(remoteAction, actionText, notification->privilegedSource());
+                }
             }
 
             for (int actionIndex = 0; actionIndex < notification->actions().count() / 2; actionIndex++) {
                 // Actions are sent over as a list of pairs. Each even element in the list (starting at index 0) represents
-                // the identifier for the action. Each odd element in the list is the localized string that will be displayed to the user.
+                // the identifier for the action. Each odd element in the list is the localized string that will
+                // be displayed to the user.
                 if (notification->actions().at(actionIndex * 2) == action) {
                     NOTIFICATIONS_DEBUG("INVOKE ACTION:" << action << id);
 
@@ -1452,11 +1504,11 @@ void NotificationManager::expire()
 
     QSqlQuery expirationQuery("SELECT * FROM expiration", *m_database);
     QSqlRecord expirationRecord = expirationQuery.record();
-    int expirationTableIdFieldIndex = expirationRecord.indexOf("id");
-    int expirationTableExpireAtFieldIndex = expirationRecord.indexOf("expire_at");
+    int expirationTableIdIndex = expirationRecord.indexOf("id");
+    int expirationTableExpireAtIndex = expirationRecord.indexOf("expire_at");
     while (expirationQuery.next()) {
-        const uint id = expirationQuery.value(expirationTableIdFieldIndex).toUInt();
-        const qint64 expiry = expirationQuery.value(expirationTableExpireAtFieldIndex).value<qint64>();
+        const uint id = expirationQuery.value(expirationTableIdIndex).toUInt();
+        const qint64 expiry = expirationQuery.value(expirationTableExpireAtIndex).value<qint64>();
 
         if (expiry <= currentTime) {
             expiredIds.append(id);
